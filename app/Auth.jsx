@@ -5,6 +5,7 @@ import { app, auth, db } from '../firebaseConfig';
 import { doc, setDoc } from 'firebase/firestore'; // Firestore methods for saving user data
 
 export default function AuthScreen() {
+  // State variables for user input, authentication status, and error handling
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -13,6 +14,7 @@ export default function AuthScreen() {
   const [nickname, setNickname] = useState('');
   const [showNicknameInput, setShowNicknameInput] = useState(false); // State to show nickname input
 
+  // Listen for authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
@@ -27,6 +29,7 @@ export default function AuthScreen() {
     return () => unsubscribe();
   }, []);
 
+  // Handle user login
   const handleLogin = () => {
     signInWithEmailAndPassword(auth, email, password)
       .then(() => {
@@ -38,6 +41,7 @@ export default function AuthScreen() {
       });
   };
 
+  // Handle user signup
   const handleSignup = () => {
     createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
@@ -52,6 +56,7 @@ export default function AuthScreen() {
       });
   };
 
+  // Handle setting a user nickname
   const handleSetNickname = async () => {
     if (!nickname.trim()) {
       setError('Nickname cannot be empty.');
@@ -71,6 +76,7 @@ export default function AuthScreen() {
     }
   };
 
+  // Handle user logout
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
@@ -83,9 +89,11 @@ export default function AuthScreen() {
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      {/* Display success or error messages */}
       {message && <Text style={{ color: 'green', marginBottom: 10 }}>{message}</Text>}
       {error && <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>}
 
+      {/* Authentication form */}
       {!user ? (
         <>
           <TextInput
@@ -106,6 +114,7 @@ export default function AuthScreen() {
         </>
       ) : (
         <>
+          {/* Nickname input after signup */}
           {showNicknameInput ? (
             <>
               <TextInput

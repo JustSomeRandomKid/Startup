@@ -5,20 +5,22 @@ import { collection, getDocs, addDoc, query, orderBy, doc, getDoc } from 'fireba
 import { WebView } from 'react-native-webview';
 
 export default function RoomsScreen() {
-  const [rooms, setRooms] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [nickname, setNickname] = useState('Guest');
-  const user = auth.currentUser;
+  const [rooms, setRooms] = useState([]); // Stores available rooms
+  const [selectedRoom, setSelectedRoom] = useState(null); // Stores the selected room
+  const [message, setMessage] = useState(''); // Stores the current input message
+  const [messages, setMessages] = useState([]); // Stores chat messages
+  const [nickname, setNickname] = useState('Guest'); // Default nickname for users
+  const user = auth.currentUser; // Get the currently authenticated user
 
   const screenHeight = Dimensions.get('window').height;
-  const [webViewHeight, setWebViewHeight] = useState(screenHeight * 0.65);
-  const minWebViewHeight = screenHeight * 0.3;
-  const maxWebViewHeight = screenHeight * 0.733;
+  const [webViewHeight, setWebViewHeight] = useState(screenHeight * 0.65); // Default WebView height
+  const minWebViewHeight = screenHeight * 0.3; // Minimum allowed WebView height
+  const maxWebViewHeight = screenHeight * 0.733; // Maximum allowed WebView height
 
+  // Returns the current time in a readable format
   const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Fetches the list of available rooms from Firestore
   const fetchRooms = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'rooms'));
@@ -28,6 +30,7 @@ export default function RoomsScreen() {
     }
   };
 
+  // Fetches messages for the selected room
   const fetchMessages = async (roomId) => {
     if (!roomId) return;
     try {
@@ -36,12 +39,13 @@ export default function RoomsScreen() {
         orderBy('time')
       );
       const querySnapshot = await getDocs(messagesQuery);
-      setMessages(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
+      setMessages(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); // Reverse to show newest first
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   };
 
+  // Fetches the nickname of the current user from Firestore
   const fetchNickname = async () => {
     if (!user) return;
     try {
@@ -52,24 +56,26 @@ export default function RoomsScreen() {
     }
   };
 
+  // Handles sending a message
   const handleAddMessage = async () => {
-    if (!message.trim()) return;
+    if (!message.trim()) return; // Prevent sending empty messages
     try {
       const newMessage = { text: message, time: getCurrentTime(), nickname };
       await addDoc(collection(db, 'rooms', selectedRoom.id, 'messages'), newMessage);
-      setMessages([newMessage, ...messages]);
-      setMessage('');
+      setMessages([newMessage, ...messages]); // Update message list immediately
+      setMessage(''); // Clear input field
     } catch (error) {
       console.error('Error adding message:', error);
     }
   };
 
+  // Fetch initial data when the component mounts
   useEffect(() => {
     fetchRooms();
     fetchNickname();
   }, [user]);
 
-  // Dragging logic for resizing
+  // PanResponder to handle WebView resizing by dragging
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_, gestureState) => {

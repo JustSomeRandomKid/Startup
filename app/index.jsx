@@ -8,7 +8,7 @@ import { Link } from 'expo-router';
 export default function Home() {
   return(
     <View style={{ flex: 1, padding: 20 }}>
-      <Text>Firestore Chat</Text>
+      <Text>App</Text>
 
       <Link href='/Auth'>Go to Auth</Link>
       <Link href='/RoomScreen'>Go to rooms</Link>
