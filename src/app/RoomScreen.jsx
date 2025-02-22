@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, FlatList, TextInput, Dimensions, PanResponder } from 'react-native';
-import { db, auth } from '../firebaseConfig';
+import { db, auth } from '../config/firebaseConfig';
 import { collection, getDocs, addDoc, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { WebView } from 'react-native-webview';
 
 export default function RoomsScreen() {
-  const [rooms, setRooms] = useState([]); // Stores available rooms
+  const [rooms, setRooms] = useState([]); // Stores available rooms tp join
   const [selectedRoom, setSelectedRoom] = useState(null); // Stores the selected room
   const [message, setMessage] = useState(''); // Stores the current input message
   const [messages, setMessages] = useState([]); // Stores chat messages
@@ -17,7 +17,7 @@ export default function RoomsScreen() {
   const minWebViewHeight = screenHeight * 0.3; // Minimum allowed WebView height
   const maxWebViewHeight = screenHeight * 0.733; // Maximum allowed WebView height
 
-  // Returns the current time in a readable format
+  // Returns the current time in a readable format for Firebase to store
   const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Fetches the list of available rooms from Firestore

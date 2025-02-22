@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { TextInput, Button, View, Text } from 'react-native';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { app, auth, db } from '../firebaseConfig';
-import { doc, setDoc } from 'firebase/firestore'; // Firestore methods for saving user data
+import { app, auth, db } from '../config/firebaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function AuthScreen() {
-  // State variables for user input, authentication status, and error handling
+  // UseState variables for user input, authentication status, and error handling
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
