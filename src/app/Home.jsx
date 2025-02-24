@@ -1,16 +1,31 @@
-import React from 'react';
-import { Box, Text } from '@chakra-ui/react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+import Auth from "./Auth"; // Import the Auth component
+import RoomScreen from "./RoomScreen"; // Import the RoomScreen component
 
-console.log("Rendering Home component...");
-
-export default function Home() {
-  console.log("yes")
+function Home() {
   return (
-    <Box>
-      <Text>App</Text>
-      <Link to="/Auth">Go to Auth</Link>
-      <Link to="/RoomScreen">Go to rooms</Link>
-    </Box>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+      <h1>App</h1>
+      <nav>
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          <li>
+            <Link to="/Auth" style={{ textDecoration: "none", color: "blue" }}>Go to Auth</Link>
+          </li>
+          <li>
+            <Link to="/RoomScreen" style={{ textDecoration: "none", color: "blue" }}>Go to rooms</Link>
+          </li>
+        </ul>
+      </nav>
+
+      {/* Define Routes here */}
+      <Routes>
+        <Route path="/Auth" element={<Auth />} />
+        <Route path="/RoomScreen" element={<RoomScreen />} />
+      </Routes>
+    </div>
   );
 }
+
+export default Home;

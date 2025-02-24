@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.8.1",
+    "@chakra-ui/theme-utils": "^2.0.21",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@react-native-async-storage/async-storage": "^1.24.0",
