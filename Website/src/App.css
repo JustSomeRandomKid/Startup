@@ -1,0 +1,46 @@
+/* General App Container */
+.app-container {
+    text-align: center;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  h1 {
+    font-size: 2em;
+    margin-bottom: 20px;
+  }
+  
+  /* Video Container */
+  .videos-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  
+  .video-element {
+    width: 400px;
+    height: 300px;
+    border-radius: 10px;
+    margin: 10px;
+    object-fit: cover;
+  }
+  
+  /* Start Button */
+  .start-button {
+    background-color: #ff4500;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2em;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  
+  .start-button:hover {
+    background-color: #e43f00;
+  }
+  
+  .start-button:disabled {
+    background-color: #ccc;
+  }  
