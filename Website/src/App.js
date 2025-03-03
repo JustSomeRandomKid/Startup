@@ -1,118 +1,231 @@
-import React, { useEffect, useRef, useState } from 'react';
-import io from 'socket.io-client';
+import React, { useState, useEffect, useRef } from "react";
+import io from "socket.io-client";
+import "./App.css";
 
-const socket = io('http://localhost:5000'); // Connect to the signaling server
+const socket = io("http://localhost:5000");
 
 const App = () => {
-  const videoRef = useRef(null);
+  const [isCameraStarted, setIsCameraStarted] = useState(false);
+  const [inCall, setInCall] = useState(false);
+  const [partnerStream, setPartnerStream] = useState(null);
+  const [waitingForPartner, setWaitingForPartner] = useState(false); // Add a state for waiting
+  const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const peerConnection = useRef(null);
-  const [stream, setStream] = useState(null);
-  const [isInCall, setIsInCall] = useState(false);
+  const peerConnectionRef = useRef(null);
+  const candidateQueueRef = useRef([]);
+
+  // Update remote video element when partnerStream changes
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = partnerStream;
+    }
+  }, [partnerStream]);
 
   useEffect(() => {
-    socket.on('offer', async (offer) => {
-      if (!peerConnection.current) createPeerConnection();
-
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.current.createAnswer();
-      await peerConnection.current.setLocalDescription(answer);
-      socket.emit('answer', answer);
-    });
-
-    socket.on('answer', async (answer) => {
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-    });
-
-    socket.on('candidate', async (candidate) => {
-      if (peerConnection.current) {
-        await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    socket.on("candidate", (candidate) => {
+      if (
+        peerConnectionRef.current &&
+        peerConnectionRef.current.remoteDescription
+      ) {
+        peerConnectionRef.current
+          .addIceCandidate(new RTCIceCandidate(candidate))
+          .catch((err) => console.error("Error adding candidate:", err));
+      } else {
+        candidateQueueRef.current.push(candidate);
       }
     });
 
-    socket.on('disconnectCall', () => {
-      endCall();
+    socket.on("answer", async (answer) => {
+      if (peerConnectionRef.current) {
+        // If remoteDescription isn't set, set it and flush queued ICE candidates.
+        if (!peerConnectionRef.current.remoteDescription) {
+          try {
+            await peerConnectionRef.current.setRemoteDescription(answer);
+            flushCandidateQueue();
+          } catch (err) {
+            console.error(
+              "Error setting remote description from answer:",
+              err
+            );
+          }
+        } else {
+          console.log("Remote description already set; ignoring duplicate answer.");
+        }
+      }
+    });
+
+    socket.on("offer", (offer) => {
+      console.log("Received offer:", offer);
+      handleOffer(offer);
+    });
+
+    socket.on("disconnectCall", () => {
+      leaveCall();
+      setWaitingForPartner(false); // Stop waiting when disconnected
     });
 
     return () => {
-      socket.off('offer');
-      socket.off('answer');
-      socket.off('candidate');
-      socket.off('disconnectCall');
+      socket.off("candidate");
+      socket.off("answer");
+      socket.off("offer");
+      socket.off("disconnectCall");
     };
-  }, []);
+  }, [partnerStream]);
+
+  const flushCandidateQueue = () => {
+    if (
+      peerConnectionRef.current &&
+      peerConnectionRef.current.remoteDescription
+    ) {
+      candidateQueueRef.current.forEach((candidate) => {
+        peerConnectionRef.current
+          .addIceCandidate(new RTCIceCandidate(candidate))
+          .catch((err) =>
+            console.error("Error adding queued candidate:", err)
+          );
+      });
+      candidateQueueRef.current = [];
+    }
+  };
 
   const startCamera = async () => {
     try {
-      const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setStream(userStream);
-      if (videoRef.current) videoRef.current.srcObject = userStream;
-    } catch (err) {
-      console.error('Error accessing media devices.', err);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      setIsCameraStarted(true);
+      initPeerConnection(stream);
+    } catch (error) {
+      console.error("Camera start failed", error);
     }
   };
 
-  const createPeerConnection = () => {
-    peerConnection.current = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  const initPeerConnection = (localStream) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
+    peerConnectionRef.current = pc;
 
-    peerConnection.current.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
+    localStream.getTracks().forEach((track) =>
+      pc.addTrack(track, localStream)
+    );
 
-    peerConnection.current.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit('candidate', event.candidate);
+        console.log("Sending ICE candidate:", event.candidate);
+        socket.emit("candidate", event.candidate);
       }
     };
 
-    stream?.getTracks().forEach((track) => {
-      peerConnection.current.addTrack(track, stream);
-    });
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        setPartnerStream(event.streams[0]);
+      }
+    };
   };
 
+  // Create and send a valid SDP offer.
   const joinCall = async () => {
-    if (!stream) {
-      alert("Start your camera first!");
+    // Reinitialize connection if needed.
+    if (!peerConnectionRef.current) {
+      initPeerConnection(localVideoRef.current.srcObject);
+    }
+    try {
+      const offer = await peerConnectionRef.current.createOffer();
+      await peerConnectionRef.current.setLocalDescription(offer);
+      socket.emit("findPartner", offer);
+      setWaitingForPartner(true); // Set waiting state to true
+      setInCall(true);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+    }
+  };
+
+  // Handle received offer: set remote description, flush queued ICE candidates, then send answer.
+  const handleOffer = async (offer) => {
+    if (!peerConnectionRef.current) return;
+    if (peerConnectionRef.current.remoteDescription) {
+      console.warn("Offer received but remote description already set; ignoring duplicate offer.");
       return;
     }
-    setIsInCall(true);
-    createPeerConnection();
-
-    const offer = await peerConnection.current.createOffer();
-    await peerConnection.current.setLocalDescription(offer);
-    socket.emit('findPartner', offer);
-  };
-
-  const skipCall = () => {
-    socket.emit('disconnectCall');
-    endCall();
-    joinCall(); // Find a new partner
-  };
-
-  const endCall = () => {
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
+    try {
+      await peerConnectionRef.current.setRemoteDescription(offer);
+      flushCandidateQueue();
+      const answer = await peerConnectionRef.current.createAnswer();
+      await peerConnectionRef.current.setLocalDescription(answer);
+      socket.emit("answer", answer);
+      setInCall(true);
+      setWaitingForPartner(false); // Partner connected, stop waiting
+    } catch (error) {
+      console.error("Error handling offer:", error);
     }
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    setIsInCall(false);
+  };
+
+  // Leave call: close connection, stop media tracks, notify server, and reset state.
+  const leaveCall = () => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if (partnerStream) {
+      partnerStream.getTracks().forEach((track) => track.stop());
+    }
+    setPartnerStream(null);
+    socket.emit("disconnectCall");
+    setInCall(false);
+    setWaitingForPartner(false); // Stop waiting when leaving
+  };
+
+  // Skip call: leave the current call and then rejoin after a short delay.
+  const skipCall = () => {
+    leaveCall();
+    setTimeout(() => {
+      if (isCameraStarted) {
+        // Reinitialize peer connection using the current local stream.
+        initPeerConnection(localVideoRef.current.srcObject);
+        joinCall();
+      }
+    }, 500);
   };
 
   return (
-    <div>
-      <h1>Omegle-Style Video Chat</h1>
-
-      <video ref={videoRef} autoPlay muted style={{ width: '45%', border: '1px solid black' }} />
-      <video ref={remoteVideoRef} autoPlay style={{ width: '45%', border: '1px solid black' }} />
-
-      <div>
-        <button onClick={startCamera}>Start Camera</button>
-        <button onClick={joinCall} disabled={isInCall}>Join Call</button>
-        <button onClick={skipCall} disabled={!isInCall}>Skip</button>
+    <div className="app">
+      <div className="video-container">
+        <div className="local-video">
+          <video ref={localVideoRef} autoPlay playsInline muted />
+        </div>
+        <div className="remote-video">
+          {partnerStream ? (
+            <video ref={remoteVideoRef} autoPlay playsInline />
+          ) : waitingForPartner ? (
+            <div className="loading-overlay">
+              <div className="loading-circle"></div>
+              <div className="waiting-text">Waiting for partner...</div>
+            </div>
+          ) : (
+            <div className="disconnected-overlay">
+              <div className="disconnected-text">Nexus</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="controls">
+        {!isCameraStarted && (
+          <button onClick={startCamera}>Start Camera</button>
+        )}
+        {isCameraStarted && !inCall && (
+          <button onClick={joinCall}>Join Call</button>
+        )}
+        {inCall && (
+          <>
+            <button onClick={leaveCall}>Leave Call</button>
+            <button onClick={skipCall}>Skip</button>
+          </>
+        )}
       </div>
     </div>
   );
