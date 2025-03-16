@@ -46,12 +46,14 @@ io.on("connection", (socket) => {
   socket.on("disconnectCall", () => {
     const partnerSocketId = activePairs.get(socket.id);
     if (partnerSocketId) {
+      // Notify partner to disconnect
       io.to(partnerSocketId).emit("disconnectCall");
+      // Remove both users from activePairs
       activePairs.delete(socket.id);
       activePairs.delete(partnerSocketId);
     }
+    // Remove current user from waiting list
     waitingUsers = waitingUsers.filter((id) => id !== socket.id);
-    logWaitingUsers();
   });
 
   socket.on("disconnect", () => {

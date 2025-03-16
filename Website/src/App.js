@@ -59,10 +59,16 @@ const App = () => {
       handleOffer(offer);
     });
 
-    socket.on("disconnectCall", () => {
-      leaveCall();
-      setWaitingForPartner(false); // Stop waiting when disconnected
-    });
+  socket.on("disconnectCall", () => {
+    leaveCall();
+    // Automatically attempt to find a new partner after a delay
+    setTimeout(() => {
+      if (localVideoRef.current?.srcObject) {
+        initPeerConnection(localVideoRef.current.srcObject);
+        joinCall();
+      }
+    }, 500);
+  });
 
     return () => {
       socket.off("candidate");
@@ -105,6 +111,11 @@ const App = () => {
   };
 
   const initPeerConnection = (localStream) => {
+    // Close existing peer connection if it exists
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+    }
+    // Create new peer connection
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
@@ -171,13 +182,14 @@ const App = () => {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
+    // Stop only the partner's stream, not the local stream
     if (partnerStream) {
       partnerStream.getTracks().forEach((track) => track.stop());
+      setPartnerStream(null);
     }
-    setPartnerStream(null);
     socket.emit("disconnectCall");
     setInCall(false);
-    setWaitingForPartner(false); // Stop waiting when leaving
+    setWaitingForPartner(false);
   };
 
   // Skip call: leave the current call and then rejoin after a short delay.
